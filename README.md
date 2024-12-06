@@ -67,3 +67,4 @@
 Если у вас возникли вопросы или проблемы с установкой и использованием бота, создайте [issue](https://github.com/JB-SelfCompany/awg-docker-bot/issues) в этом репозитории или обратитесь к разработчику.
 
 - [Matrix](https://matrix.to/#/@jack_benq:shd.company)
+# tessss
