@@ -382,3 +382,51 @@ def get_user_expiration(username: str):
 def get_user_traffic_limit(username: str):
     expirations = load_expirations()
     return expirations.get(username, {}).get('traffic_limit', "Неограниченно")
+
+def read_traffic(username: str):
+    """Читает информацию о трафике пользователя"""
+    try:
+        traffic_file = f"users/{username}/traffic.json"
+        if not os.path.exists(traffic_file):
+            return {
+                'total_incoming': 0,
+                'total_outgoing': 0,
+                'total': 0,
+                'last_incoming': 0,
+                'last_outgoing': 0
+            }
+        
+        with open(traffic_file, 'r') as f:
+            data = json.load(f)
+            data['total'] = data.get('total_incoming', 0) + data.get('total_outgoing', 0)
+            return data
+    except Exception as e:
+        logger.error(f"Ошибка при чтении трафика для пользователя {username}: {e}")
+        return None
+
+def update_traffic(username: str, incoming_bytes: int, outgoing_bytes: int):
+    """Обновляет информацию о трафике пользователя"""
+    try:
+        traffic_file = f"users/{username}/traffic.json"
+        current_data = read_traffic(username) or {
+            'total_incoming': 0,
+            'total_outgoing': 0,
+            'last_incoming': 0,
+            'last_outgoing': 0
+        }
+        
+        # Обновляем данные о трафике
+        current_data['total_incoming'] = max(incoming_bytes, current_data.get('total_incoming', 0))
+        current_data['total_outgoing'] = max(outgoing_bytes, current_data.get('total_outgoing', 0))
+        current_data['last_incoming'] = incoming_bytes
+        current_data['last_outgoing'] = outgoing_bytes
+        
+        # Сохраняем обновленные данные
+        os.makedirs(os.path.dirname(traffic_file), exist_ok=True)
+        with open(traffic_file, 'w') as f:
+            json.dump(current_data, f, indent=4)
+            
+        return current_data
+    except Exception as e:
+        logger.error(f"Ошибка при обновлении трафика для пользователя {username}: {e}")
+        return None

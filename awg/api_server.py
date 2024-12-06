@@ -303,96 +303,51 @@ async def get_client_ip_info(username: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/client/{username}/traffic")
+@app.post("/traffic/{username}")
 async def update_client_traffic(username: str, incoming_bytes: int, outgoing_bytes: int):
     """Обновить информацию о трафике клиента"""
     try:
-        await update_traffic(username, incoming_bytes, outgoing_bytes)
-        return {"status": "success"}
+        traffic = db.update_traffic(username, incoming_bytes, outgoing_bytes)
+        return {"status": "success", "traffic": traffic}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/client/{username}/traffic")
+@app.get("/traffic/{username}")
 async def get_client_traffic(username: str):
     """Получить информацию о трафике клиента"""
     try:
-        traffic_info = await read_traffic(username)
-        return traffic_info
+        traffic = db.read_traffic(username)
+        return {"status": "success", "traffic": traffic}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/client/{username}/deactivate")
+@app.post("/clients/{username}/deactivate")
 async def deactivate_client(username: str):
     """Деактивировать клиента"""
     try:
         await deactivate_user(username)
-        return {"status": "success"}
+        return {"message": f"Client {username} successfully deactivated"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
-async def update_traffic(username: str, incoming_bytes: int, outgoing_bytes: int):
-    """Обновляет информацию о трафике пользователя"""
-    try:
-        traffic_file = os.path.join('files', 'traffic', f'{username}_traffic.json')
-        os.makedirs(os.path.dirname(traffic_file), exist_ok=True)
-        
-        current_data = {}
-        if os.path.exists(traffic_file):
-            with open(traffic_file, 'r') as f:
-                current_data = json.loads(f.read())
-        
-        current_data['incoming'] = incoming_bytes
-        current_data['outgoing'] = outgoing_bytes
-        current_data['last_update'] = datetime.now().strftime('%d.%m.%Y %H:%M')
-        
-        with open(traffic_file, 'w') as f:
-            json.dump(current_data, f)
-            
-    except Exception as e:
-        logging.error(f"Ошибка при обновлении трафика для {username}: {e}")
-        raise
-
-async def read_traffic(username: str):
-    """Читает информацию о трафике пользователя"""
-    try:
-        traffic_file = os.path.join('files', 'traffic', f'{username}_traffic.json')
-        if not os.path.exists(traffic_file):
-            return {
-                'incoming': 0,
-                'outgoing': 0,
-                'last_update': None
-            }
-            
-        with open(traffic_file, 'r') as f:
-            data = json.loads(f.read())
-            return data
-            
-    except Exception as e:
-        logging.error(f"Ошибка при чтении трафика для {username}: {e}")
-        raise
 
 async def deactivate_user(username: str):
     """Деактивирует пользователя"""
     try:
-        # Получаем текущую конфигурацию
-        config = db.get_config()
-        docker_container = config['docker_container']
-        wg_config_file = config['wg_config_file']
-        
-        # Удаляем пользователя из WireGuard
-        cmd = ["docker", "exec", docker_container, "wg-quick", "down", wg_config_file]
-        subprocess.run(cmd, check=True)
-        
-        # Удаляем из базы данных
+        # Деактивируем пользователя
         db.deactive_user_db(username)
         
-        # Перезапускаем WireGuard
-        cmd = ["docker", "exec", docker_container, "wg-quick", "up", wg_config_file]
-        subprocess.run(cmd, check=True)
+        # Удаляем информацию о сроке действия
+        db.remove_user_expiration(username)
         
+        # Очищаем информацию о трафике
+        traffic_file = f"users/{username}/traffic.json"
+        if os.path.exists(traffic_file):
+            os.remove(traffic_file)
+            
+        return True
     except Exception as e:
         logging.error(f"Ошибка при деактивации пользователя {username}: {e}")
-        raise
+        return False
 
 if __name__ == "__main__":
     uvicorn.run("api_server:app", host="0.0.0.0", port=8000, reload=True)
