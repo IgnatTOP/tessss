@@ -141,14 +141,19 @@ async def list_clients():
         result = []
         
         for client in clients:
-            username = client['userData']
+            username = client[0]  # First element is username
             expiration = db.get_user_expiration(username)
             traffic_limit = db.get_user_traffic_limit(username)
             traffic = db.read_traffic(username)
             
+            # Get client's public key from the full client list
+            all_clients = db.get_client_list()
+            client_info = next((c for c in all_clients if c[0] == username), None)
+            public_key = client_info[1] if client_info else "Unknown"
+            
             result.append(ClientInfo(
                 username=username,
-                public_key=client['clientId'],
+                public_key=public_key,
                 created_at=datetime.now(),  # В текущей реализации нет сохранения даты создания
                 expiration=expiration,
                 traffic_limit=traffic_limit,
@@ -202,7 +207,7 @@ async def update_client(username: str, client_update: ClientUpdate):
         client_info = None
         
         for client in clients:
-            if client['userData'] == username:
+            if client[0] == username:  # Check username which is first element
                 client_exists = True
                 client_info = client
                 break
@@ -217,11 +222,16 @@ async def update_client(username: str, client_update: ClientUpdate):
             client_update.traffic_limit
         )
         
+        # Get client's public key from the full client list
+        all_clients = db.get_client_list()
+        full_client_info = next((c for c in all_clients if c[0] == username), None)
+        public_key = full_client_info[1] if full_client_info else "Unknown"
+        
         # Получаем обновленную информацию
         traffic = db.read_traffic(username)
         return ClientInfo(
             username=username,
-            public_key=client_info['clientId'],
+            public_key=public_key,
             created_at=datetime.now(),
             expiration=client_update.expiration,
             traffic_limit=client_update.traffic_limit,
