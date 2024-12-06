@@ -991,14 +991,15 @@ async def update_all_clients_traffic():
         username = client[0]
         transfer = client[2]
         incoming_bytes, outgoing_bytes = parse_transfer(transfer)
-        traffic_data = await update_traffic(username, incoming_bytes, outgoing_bytes)
-        logger.info(f"Обновлён трафик для пользователя {username}: Входящий {traffic_data['total_incoming']} B, Исходящий {traffic_data['total_outgoing']} B")
-        traffic_limit = db.get_user_traffic_limit(username)
-        if traffic_limit != "Неограниченно":
-            limit_bytes = parse_traffic_limit(traffic_limit)
-            total_bytes = traffic_data.get('total_incoming', 0) + traffic_data.get('total_outgoing', 0)
-            if total_bytes >= limit_bytes:
-                await deactivate_user(username)
+        traffic_data = db.update_traffic(username, incoming_bytes, outgoing_bytes)
+        if traffic_data:
+            logger.info(f"Обновлён трафик для пользователя {username}: Входящий {traffic_data['total_incoming']} B, Исходящий {traffic_data['total_outgoing']} B")
+            traffic_limit = db.get_user_traffic_limit(username)
+            if traffic_limit != "Неограниченно":
+                limit_bytes = parse_traffic_limit(traffic_limit)
+                total_bytes = traffic_data.get('total_incoming', 0) + traffic_data.get('total_outgoing', 0)
+                if total_bytes >= limit_bytes:
+                    await deactivate_user(username)
     logger.info("Завершено обновление трафика для всех клиентов.")
 
 async def generate_vpn_key(conf_path: str) -> str:
